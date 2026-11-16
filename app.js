@@ -102,6 +102,12 @@ function pendingChecks() {
 function pendingRequests() {
   return state.requests.filter(r => r.status === 'attente').sort((a, b) => a.at - b.at);
 }
+// Ordre d'affichage : tâches en famille d'abord, puis de celle qui rapporte le plus à celle qui rapporte le moins.
+function sortedTasks() {
+  return state.tasks.slice().sort((a, b) =>
+    (b.family - a.family) || ((b.family ? 0 : b.points) - (a.family ? 0 : a.points)) || a.title.localeCompare(b.title, 'fr'));
+}
+
 function pendingProposals() {
   return state.proposals.filter(p => p.status === 'attente').sort((a, b) => a.at - b.at);
 }
@@ -213,7 +219,7 @@ function render() {
 
 function renderJour() {
   const d = today();
-  const tasks = state.tasks.filter(t => t.active);
+  const tasks = sortedTasks().filter(t => t.active);
   const done = tasks.filter(t => checkFor(t.id, d)).length;
   const waiting = pointsWaiting();
 
@@ -648,8 +654,8 @@ function validateCheck(id) {
 }
 
 function parentTaches() {
-  let html = '<h2>Les missions du jour</h2><p class="sub">Elles reviennent chaque jour.</p><div class="list">';
-  for (const t of state.tasks) {
+  let html = '<h2>Les missions du jour</h2><p class="sub">Elles reviennent chaque jour, rangées automatiquement : en famille d\'abord, puis de la plus à la moins payée.</p><div class="list">';
+  for (const t of sortedTasks()) {
     html += `
       <div class="item ${t.active ? '' : 'off'}">
         <span class="emoji">${esc(t.emoji)}</span>
