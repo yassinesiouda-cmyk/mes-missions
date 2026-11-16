@@ -4,8 +4,8 @@
 const STORE_KEY = 'mes-missions-v1';
 const KEEP_DAYS = 60; // historique conservé (hors éléments en attente)
 
-const EMOJIS_TACHES = ['🧸', '📚', '🎒', '🛏️', '🦷', '🍽️', '👕', '🧹', '🐶', '🌱', '🚿', '🎹', '⚽', '📖', '🧺', '♻️'];
-const EMOJIS_RECOMPENSES = ['📺', '🎮', '🌳', '🍦', '🍕', '🎬', '🛝', '🎨', '📱', '🧁', '🏊', '🎁'];
+const EMOJIS_TACHES = ['📺', '💛', '🧸', '📚', '🎒', '🛏️', '🦷', '🍽️', '👕', '🧹', '🐶', '🌱', '🚿', '🎹', '⚽', '📖', '🧺', '♻️'];
+const EMOJIS_RECOMPENSES = ['🏍️', '🍣', '📺', '🎮', '🌳', '🍦', '🍕', '🎬', '🛝', '🎨', '📱', '🧁', '🏊', '🎁'];
 
 /* ---------- Données ---------- */
 
