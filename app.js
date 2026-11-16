@@ -1,7 +1,8 @@
 /* Mes Missions — tout est stocké sur l'appareil (localStorage), rien n'est envoyé ailleurs. */
 'use strict';
 
-const APP_VERSION = '6';
+const APP_VERSION = '7';
+const BONUS_ID = '__bonus__';
 const STORE_KEY = 'mes-missions-v1';
 const KEEP_DAYS = 60; // historique conservé (hors éléments en attente)
 
@@ -28,6 +29,8 @@ function defaultState() {
     theme: 'sakura',
     pin: null,
     balance: 0,
+    // Bonus « journée complète » : toutes les tâches cochées, y compris en famille. Validé par le parent.
+    bonus: { enabled: true, points: 5 },
     tasks: [
       { id: uid(), emoji: '🛏️', title: 'Ranger ma chambre', points: 10, family: false, active: true },
       { id: uid(), emoji: '📚', title: 'Faire mes devoirs', points: 15, family: false, active: true },
@@ -221,8 +224,13 @@ function render() {
 function renderJour() {
   const d = today();
   const tasks = sortedTasks().filter(t => t.active);
-  const done = tasks.filter(t => checkFor(t.id, d)).length;
+  const done = tasks.filter(t => isDone(t.id, d)).length;
   const waiting = pointsWaiting();
+  const b = checkFor(BONUS_ID, d);
+  let bonusLine = '';
+  if (b && b.status === 'valide') bonusLine = `<span class="pill">🌟 Bonus +${b.points} gagné</span>`;
+  else if (b && b.status === 'attente') bonusLine = `<span class="pill attente">🌟 Bonus +${b.points} en attente</span>`;
+  else if (!b && state.bonus.enabled) bonusLine = `<span class="hint">🌟 Tout faire, même en famille = <b>+${state.bonus.points} bonus</b></span>`;
 
   if (!tasks.length) {
     view.innerHTML = buddyHTML(0, 0) + '<div class="empty"><span class="big">🌈</span>Pas de mission aujourd\'hui.</div>' + proposeBtn('tache');
@@ -234,6 +242,7 @@ function renderJour() {
     <div class="progress">
       <div class="progress-text"><span>${done === tasks.length ? 'Bravo, tout est fait ! 🎉' : 'Ma progression'}</span><span>${done} / ${tasks.length}</span></div>
       <div class="bar"><div style="width:${pct}%"></div></div>
+      ${bonusLine ? `<div style="margin-top:8px">${bonusLine}</div>` : ''}
     </div>`;
   if (waiting > 0) html += `<p class="sub">⏳ <b>${waiting} points</b> attendent la validation de ton parent.</p>`;
 
@@ -347,6 +356,30 @@ function propose(type) {
   });
 }
 
+function isDone(taskId, d) {
+  const c = checkFor(taskId, d);
+  return !!c && c.status !== 'refuse';
+}
+
+// Crée ou retire le bonus du jour selon que tout est coché. Renvoie true s'il vient d'être créé.
+function syncBonus() {
+  const d = today();
+  const tasks = state.tasks.filter(t => t.active);
+  const complete = tasks.length > 0 && tasks.every(t => isDone(t.id, d));
+  const b = checkFor(BONUS_ID, d);
+  if (complete && state.bonus.enabled && !b) {
+    state.checks.push({
+      id: uid(), taskId: BONUS_ID, date: d, at: Date.now(),
+      title: 'Journée complète', emoji: '🌟', points: state.bonus.points, status: 'attente',
+    });
+    return true;
+  }
+  if ((!complete || !state.bonus.enabled) && b && b.status === 'attente') {
+    state.checks = state.checks.filter(x => x !== b);
+  }
+  return false;
+}
+
 function toggleTask(id) {
   const t = state.tasks.find(x => x.id === id);
   if (!t) return;
@@ -369,6 +402,10 @@ function toggleTask(id) {
     toast('C\'est noté, ton parent va revérifier ⏳');
   } else {
     state.checks = state.checks.filter(x => x !== c); // décocher
+  }
+  if (syncBonus()) {
+    confetti();
+    toast('Journée complète ! +' + state.bonus.points + ' bonus en attente 🌟');
   }
   save();
   render();
@@ -685,6 +722,15 @@ function parentRecompenses() {
 function parentReglages() {
   return `
     <div class="card">
+      <b>🌟 Bonus journée complète</b>
+      <p class="hint">Quand toutes les tâches du jour sont cochées, y compris en famille, un bonus arrive dans « À valider ». Garde-le petit.</p>
+      <label class="switch"><input type="checkbox" id="bonusOn" ${state.bonus.enabled ? 'checked' : ''}> Activé</label>
+      <div class="row" style="margin-top:10px;flex-wrap:nowrap">
+        <input type="number" id="bonusPts" min="1" max="50" inputmode="numeric" value="${state.bonus.points}">
+        <button class="btn petit" data-act="save-bonus">OK</button>
+      </div>
+    </div>
+    <div class="card">
       <label class="f" for="childName">Prénom affiché</label>
       <div class="row" style="flex-wrap:nowrap">
         <input type="text" id="childName" maxlength="20" value="${esc(state.childName)}" placeholder="Prénom">
@@ -788,6 +834,7 @@ function editTask(id, prefill, onSaved) {
       if (t.id) Object.assign(state.tasks.find(x => x.id === t.id), data);
       else state.tasks.push(Object.assign({ id: uid() }, data));
       if (onSaved) onSaved();
+      syncBonus();
       save(); closeModal(); render();
     },
     del() {
@@ -823,6 +870,7 @@ function editReward(id, prefill, onSaved) {
       if (r.id) Object.assign(state.rewards.find(x => x.id === r.id), data);
       else state.rewards.push(Object.assign({ id: uid() }, data));
       if (onSaved) onSaved();
+      syncBonus();
       save(); closeModal(); render();
     },
     del() {
@@ -904,6 +952,7 @@ view.addEventListener('click', e => {
     case 'refuse': {
       const c = state.checks.find(x => x.id === id);
       if (c) c.status = 'refuse';
+      if (c && c.taskId !== BONUS_ID) syncBonus();
       save(); render(); break;
     }
     case 'req-accept': {
@@ -926,6 +975,9 @@ view.addEventListener('click', e => {
     case 'save-name':
       state.childName = $('#childName').value.trim().slice(0, 20);
       save(); toast('Prénom enregistré'); render(); break;
+    case 'save-bonus':
+      state.bonus = { enabled: $('#bonusOn').checked, points: Math.max(1, Math.min(50, parseInt($('#bonusPts').value, 10) || 5)) };
+      syncBonus(); save(); toast('Bonus enregistré'); render(); break;
     case 'adjust': {
       const n = parseInt($('#adjust').value, 10);
       if (!n) break;
