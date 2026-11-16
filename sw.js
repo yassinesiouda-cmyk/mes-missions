@@ -1,6 +1,6 @@
 // Service worker : garde l'app en cache pour qu'elle s'ouvre vite, même sans réseau.
 // Changer VERSION à chaque mise à jour des fichiers pour forcer le rafraîchissement.
-const VERSION = 'missions-v3';
+const VERSION = 'missions-v4';
 const FILES = [
   './',
   'index.html',
