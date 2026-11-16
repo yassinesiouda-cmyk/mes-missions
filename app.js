@@ -1,7 +1,7 @@
 /* Mes Missions — tout est stocké sur l'appareil (localStorage), rien n'est envoyé ailleurs. */
 'use strict';
 
-const APP_VERSION = '7';
+const APP_VERSION = '8';
 const BONUS_ID = '__bonus__';
 const STORE_KEY = 'mes-missions-v1';
 const KEEP_DAYS = 60; // historique conservé (hors éléments en attente)
@@ -31,6 +31,8 @@ function defaultState() {
     balance: 0,
     // Bonus « journée complète » : toutes les tâches cochées, y compris en famille. Validé par le parent.
     bonus: { enabled: true, points: 5 },
+    // Entraînement de calcul mental (voir games.js)
+    calc: { enabled: true, points: 10, level: 2, history: [] },
     tasks: [
       { id: uid(), emoji: '🛏️', title: 'Ranger ma chambre', points: 10, family: false, active: true },
       { id: uid(), emoji: '📚', title: 'Faire mes devoirs', points: 15, family: false, active: true },
@@ -190,7 +192,8 @@ function resetLock() {
 }
 
 function setTab(t) {
-  if (!(t === 'parent' && tab === 'parent')) resetLock(); // on reverrouille dès qu'on quitte l'espace parent
+  if (!(t === 'parent' && tab === 'parent')) resetLock();
+  game = null; // quitter un onglet arrête la séance de calcul en cours // on reverrouille dès qu'on quitte l'espace parent
   tab = t;
   render();
   window.scrollTo(0, 0);
@@ -214,7 +217,7 @@ function render() {
     b.setAttribute('aria-selected', b.dataset.tab === tab);
   });
   renderHeader();
-  if (tab === 'jour') renderJour();
+  if (tab === 'jour') { if (game) renderGame(); else renderJour(); }
   else if (tab === 'magasin') renderMagasin();
   else renderParent();
 }
@@ -268,7 +271,7 @@ function renderJour() {
         <span class="check">${mark}</span>
       </button>`;
   }
-  html += '</div>' + proposeBtn('tache');
+  html += '</div>' + calcCardHTML() + proposeBtn('tache');
   view.innerHTML = html;
 }
 
@@ -720,7 +723,7 @@ function parentRecompenses() {
 }
 
 function parentReglages() {
-  return `
+  return calcSettingsHTML() + `
     <div class="card">
       <b>🌟 Bonus journée complète</b>
       <p class="hint">Quand toutes les tâches du jour sont cochées, y compris en famille, un bonus arrive dans « À valider ». Garde-le petit.</p>
@@ -975,6 +978,14 @@ view.addEventListener('click', e => {
     case 'save-name':
       state.childName = $('#childName').value.trim().slice(0, 20);
       save(); toast('Prénom enregistré'); render(); break;
+    case 'game-start': startGame(); break;
+    case 'game-key': gameKey(b.dataset.k); break;
+    case 'game-close': game = null; render(); window.scrollTo(0, 0); break;
+    case 'save-calc':
+      state.calc.enabled = $('#calcOn').checked;
+      state.calc.points = Math.max(1, Math.min(50, parseInt($('#calcPts').value, 10) || 10));
+      state.calc.level = Math.max(1, Math.min(6, parseInt($('#calcLevel').value, 10) || 2));
+      save(); toast('Calcul mental enregistré'); render(); break;
     case 'save-bonus':
       state.bonus = { enabled: $('#bonusOn').checked, points: Math.max(1, Math.min(50, parseInt($('#bonusPts').value, 10) || 5)) };
       syncBonus(); save(); toast('Bonus enregistré'); render(); break;
