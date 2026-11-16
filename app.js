@@ -1,6 +1,7 @@
 /* Mes Missions — tout est stocké sur l'appareil (localStorage), rien n'est envoyé ailleurs. */
 'use strict';
 
+const APP_VERSION = '6';
 const STORE_KEY = 'mes-missions-v1';
 const KEEP_DAYS = 60; // historique conservé (hors éléments en attente)
 
@@ -702,7 +703,8 @@ function parentReglages() {
       <b>Code parent</b>
       <p class="hint">Si tu l'oublies, il faudra effacer les données de l'app dans Chrome (tout sera perdu).</p>
       <p><button class="btn gris" data-act="change-pin">Changer le code</button></p>
-    </div>`;
+    </div>
+    <p class="hint" style="text-align:center">Version ${APP_VERSION}</p>`;
 }
 
 /* ---------- Formulaires (modale) ---------- */
