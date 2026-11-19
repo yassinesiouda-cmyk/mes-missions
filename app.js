@@ -1,7 +1,7 @@
 /* Ganba! — tout est stocké sur l'appareil (localStorage), rien n'est envoyé ailleurs. */
 'use strict';
 
-const APP_VERSION = '9';
+const APP_VERSION = '10';
 const BONUS_ID = '__bonus__';
 const STORE_KEY = 'mes-missions-v1';
 const KEEP_DAYS = 60; // historique conservé (hors éléments en attente)
@@ -723,7 +723,7 @@ function parentRecompenses() {
 }
 
 function parentReglages() {
-  return calcSettingsHTML() + `
+  return backupHTML() + calcSettingsHTML() + `
     <div class="card">
       <b>🌟 Bonus journée complète</b>
       <p class="hint">Quand toutes les tâches du jour sont cochées, y compris en famille, un bonus arrive dans « À valider ». Garde-le petit.</p>
@@ -884,6 +884,56 @@ function editReward(id, prefill, onSaved) {
   });
 }
 
+/* ---------- Sauvegarde ---------- */
+
+function backupHTML() {
+  return `
+    <div class="card">
+      <b>💾 Sauvegarde</b>
+      <p class="hint">Télécharge un fichier avec toutes les données (tâches, points, réglages, code). À faire avant de réinstaller l'app ou de changer de téléphone. Garde-le pour toi : il contient ses données.</p>
+      <div class="row" style="margin-top:10px">
+        <button class="btn petit" data-act="backup">Télécharger une sauvegarde</button>
+        <button class="btn gris petit" data-act="restore">Restaurer</button>
+      </div>
+      <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+    </div>`;
+}
+
+function downloadBackup() {
+  const data = JSON.stringify({ app: 'ganba', savedAt: new Date().toISOString(), state }, null, 1);
+  const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ganba-sauvegarde-' + today() + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast('Sauvegarde téléchargée 💾');
+}
+
+document.addEventListener('change', e => {
+  if (e.target.id !== 'restoreFile' || !e.target.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      const s = parsed && parsed.app === 'ganba' ? parsed.state : null;
+      if (!s || !Array.isArray(s.tasks) || !Array.isArray(s.rewards) || typeof s.balance !== 'number') throw new Error('format');
+      if (!confirm('Remplacer toutes les données actuelles par cette sauvegarde ?')) return;
+      state = Object.assign(defaultState(), s);
+      document.body.dataset.theme = state.theme;
+      save();
+      toast('Sauvegarde restaurée ✅');
+      render();
+    } catch (err) {
+      toast('⚠️ Ce fichier n\'est pas une sauvegarde Ganba!');
+    }
+  };
+  reader.readAsText(e.target.files[0]);
+  e.target.value = '';
+});
+
 /* ---------- Petit mot du parent ---------- */
 
 // Féliciter l'effort et l'organisation plutôt que « tu es intelligente ».
@@ -986,6 +1036,8 @@ view.addEventListener('click', e => {
       state.calc.points = Math.max(1, Math.min(50, parseInt($('#calcPts').value, 10) || 10));
       state.calc.level = Math.max(1, Math.min(6, parseInt($('#calcLevel').value, 10) || 2));
       save(); toast('Calcul mental enregistré'); render(); break;
+    case 'backup': downloadBackup(); break;
+    case 'restore': $('#restoreFile').click(); break;
     case 'save-bonus':
       state.bonus = { enabled: $('#bonusOn').checked, points: Math.max(1, Math.min(50, parseInt($('#bonusPts').value, 10) || 5)) };
       syncBonus(); save(); toast('Bonus enregistré'); render(); break;
