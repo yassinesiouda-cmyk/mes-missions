@@ -1,6 +1,6 @@
 // Service worker : garde l'app en cache pour qu'elle s'ouvre vite, même sans réseau.
 // Changer VERSION à chaque mise à jour des fichiers pour forcer le rafraîchissement.
-const VERSION = 'missions-v8';
+const VERSION = 'missions-v9';
 const FILES = [
   './',
   'index.html',
@@ -9,9 +9,9 @@ const FILES = [
   'mascot.js',
   'games.js',
   'manifest.webmanifest',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-maskable-512.png',
+  'icons/icon-192-v2.png',
+  'icons/icon-512-v2.png',
+  'icons/icon-maskable-512-v2.png',
 ];
 
 self.addEventListener('install', e => {

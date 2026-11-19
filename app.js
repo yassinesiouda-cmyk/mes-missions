@@ -1,7 +1,7 @@
-/* Mes Missions — tout est stocké sur l'appareil (localStorage), rien n'est envoyé ailleurs. */
+/* Ganba! — tout est stocké sur l'appareil (localStorage), rien n'est envoyé ailleurs. */
 'use strict';
 
-const APP_VERSION = '8';
+const APP_VERSION = '9';
 const BONUS_ID = '__bonus__';
 const STORE_KEY = 'mes-missions-v1';
 const KEEP_DAYS = 60; // historique conservé (hors éléments en attente)
@@ -169,7 +169,7 @@ let lastPoints = null;
 function renderHeader() {
   const name = state.childName.trim();
   const jour = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-  $('#hello').innerHTML = (name ? 'Salut ' + esc(name) + ' 👋' : 'Mes Missions ✨') + '<small>' + esc(jour) + '</small>';
+  $('#hello').innerHTML = (name ? 'Salut ' + esc(name) + ' 👋' : 'Ganba! ✨') + '<small>' + esc(jour) + '</small>';
   $('#pointsValue').textContent = pointsAvailable();
   if (lastPoints !== null && lastPoints !== pointsAvailable()) {
     const b = $('#pointsBadge');
@@ -305,7 +305,7 @@ function buddyHTML(done, total) {
     const l = ['Une de plus ! Tu avances bien 💪', 'Pas à pas, c\'est comme ça qu\'on y arrive 🌸', 'Continue, tu gères ✨'];
     text = l[done % l.length];
   } else {
-    text = 'Coucou ! Par quoi tu commences aujourd\'hui ?';
+    text = 'Ganba ! Par quoi tu commences aujourd\'hui ?';
   }
   if (!state.mascotChosen && !msg) text += '<br><small>(Touche-moi pour choisir ton compagnon)</small>';
   return `

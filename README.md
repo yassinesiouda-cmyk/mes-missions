@@ -1,4 +1,6 @@
-# Mes Missions : app de tâches pour enfant (PWA)
+# Ganba! : app de tâches pour enfant (PWA)
+
+*Ganba* vient du japonais *ganbaru* : « faire de son mieux, persévérer ».
 
 Web app installable (PWA), en HTML/CSS/JS vanilla, sans dépendance, sans
 compte et sans serveur. Toutes les données restent dans le navigateur du
