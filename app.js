@@ -1,12 +1,13 @@
 /* Ganba! — tout est stocké sur l'appareil (localStorage), rien n'est envoyé ailleurs. */
 'use strict';
 
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 const BONUS_ID = '__bonus__';
 const STORE_KEY = 'mes-missions-v1';
 const KEEP_DAYS = 60; // historique conservé (hors éléments en attente)
 
-const EMOJIS_TACHES = ['📺', '💛', '🧸', '📚', '🎒', '🛏️', '🦷', '🍽️', '👕', '🧹', '🐶', '🌱', '🚿', '🎹', '⚽', '📖', '🧺', '♻️'];
+const EMOJIS_TACHES = ['🌙', '📺', '💛', '🧸', '📚', '🎒', '🛏️', '🦷', '🍽️', '👕', '🧹', '🐶', '🌱', '🚿', '🎹', '⚽', '📖', '🧺', '♻️'];
+const EMOJIS_RETRAITS = ['🤥', '🙊', '😤', '💥', '🚫', '📵', '🧹', '⏰'];
 const EMOJIS_RECOMPENSES = ['🏍️', '🍣', '📺', '🎮', '🌳', '🍦', '🍕', '🎬', '🛝', '🎨', '📱', '🧁', '🏊', '🎁'];
 
 /* ---------- Données ---------- */
@@ -55,6 +56,12 @@ function defaultState() {
     proposals: [],
     // Petits mots du parent : { text, at, seen }
     messages: [],
+    // Retraits de points : liste fixée à l'avance par le parent, et historique.
+    penalties: [
+      { id: uid(), emoji: '🤥', title: 'Mentir', cost: 10 },
+      { id: uid(), emoji: '🙊', title: 'Manquer de respect', cost: 10 },
+    ],
+    penaltyLog: [],
   };
 }
 
@@ -289,7 +296,12 @@ function buddyHTML(done, total) {
   const h = new Date().getHours();
   const msg = unseenMessage();
   let mood = 'calme', from = MASCOTS[state.mascot] ? MASCOTS[state.mascot].name : 'Mochi', text, extra = '';
-  if (msg) {
+  if (msg && msg.kind === 'retrait') {
+    mood = 'calme';
+    from = '📣 Un mot de ton parent';
+    text = esc(msg.text);
+    extra = `<br><button class="btn petit" data-act="msg-seen" data-id="${msg.id}">J'ai compris</button>`;
+  } else if (msg) {
     mood = 'fiere';
     from = '💌 Un mot de ton parent';
     text = esc(msg.text);
@@ -723,7 +735,7 @@ function parentRecompenses() {
 }
 
 function parentReglages() {
-  return backupHTML() + calcSettingsHTML() + `
+  return penaltiesHTML() + backupHTML() + calcSettingsHTML() + `
     <div class="card">
       <b>🌟 Bonus journée complète</b>
       <p class="hint">Quand toutes les tâches du jour sont cochées, y compris en famille, un bonus arrive dans « À valider ». Garde-le petit.</p>
@@ -773,6 +785,11 @@ modal.addEventListener('click', e => {
     modal.querySelectorAll('[data-chip]').forEach(b => b.classList.toggle('on', b === chip));
     const ta = modal.querySelector('#fMsg');
     if (ta) ta.value = chip.dataset.chip;
+    return;
+  }
+  const pen = e.target.closest('[data-pen]');
+  if (pen) {
+    modal.querySelectorAll('[data-pen]').forEach(b => b.classList.toggle('on', b === pen));
     return;
   }
   const mas = e.target.closest('[data-mascot]');
@@ -879,6 +896,92 @@ function editReward(id, prefill, onSaved) {
     del() {
       if (!confirm('Supprimer « ' + r.title + ' » ?')) return;
       state.rewards = state.rewards.filter(x => x.id !== r.id);
+      save(); closeModal(); render();
+    },
+  });
+}
+
+/* ---------- Retraits de points ---------- */
+
+function penaltiesHTML() {
+  const list = state.penalties.map(p => `
+    <div class="item">
+      <span class="emoji">${esc(p.emoji)}</span>
+      <span class="label">${esc(p.title)}<small>−${p.cost} pts</small></span>
+      <button class="btn gris petit" data-act="edit-penalty" data-id="${p.id}">Modifier</button>
+    </div>`).join('');
+  const log = state.penaltyLog.slice(-5).reverse()
+    .map(l => `<li>${esc(dateLabel(dateOf(l.at)))} : ${esc(l.title)} (−${l.cost})</li>`).join('');
+  return `
+    <div class="card">
+      <b>⚠️ Retraits de points</b>
+      <p class="hint">À utiliser rarement, une fois calmé, et seulement pour les bêtises de cette liste, décidée avec elle à l'avance. Son compagnon lui affichera la raison.</p>
+      <p style="margin-top:10px"><button class="btn rouge petit" data-act="penalty-apply" ${state.penalties.length ? '' : 'disabled'}>Retirer des points</button></p>
+      <label class="f">La liste convenue</label>
+      <div class="list">${list || '<p class="hint">Aucune bêtise dans la liste.</p>'}</div>
+      <p style="margin-top:8px"><button class="btn gris petit" data-act="edit-penalty" data-id="">＋ Ajouter</button></p>
+      ${log ? `<label class="f">Derniers retraits</label><ul class="hist">${log}</ul>` : ''}
+    </div>`;
+}
+
+function applyPenalty() {
+  openModal(`
+    <h3>Retirer des points</h3>
+    <p class="hint">Choisis la bêtise convenue. Elle verra la raison, sans reproche.</p>
+    <div class="chips" style="margin-top:10px">${state.penalties.map(p =>
+      `<button type="button" data-pen="${p.id}">${esc(p.emoji)} ${esc(p.title)} · −${p.cost}</button>`).join('')}</div>
+    <label class="f" for="fMsg">Un mot pour expliquer (facultatif)</label>
+    <textarea id="fMsg" maxlength="140" placeholder="ex. On en reparle calmement ce soir 💜"></textarea>
+    <div class="actions">
+      <button class="btn gris" data-m="close">Annuler</button>
+      <button class="btn rouge" data-m="ok">Retirer</button>
+    </div>`, {
+    ok() {
+      const on = modal.querySelector('[data-pen].on');
+      if (!on) { toast('Choisis une bêtise dans la liste'); return; }
+      const p = state.penalties.find(x => x.id === on.dataset.pen);
+      if (!p) return;
+      // Jamais sous zéro, et sans toucher aux points réservés pour une récompense déjà demandée.
+      const cost = Math.min(p.cost, Math.max(0, pointsAvailable()));
+      if (cost === 0) { closeModal(); toast('Elle n\'a plus de points disponibles : rien n\'a été retiré'); return; }
+      state.balance -= cost;
+      state.penaltyLog.push({ id: uid(), title: p.title, cost, at: Date.now() });
+      state.penaltyLog = state.penaltyLog.slice(-30);
+      const note = $('#fMsg').value.trim();
+      state.messages.push({ id: uid(), kind: 'retrait', seen: false, at: Date.now(),
+        text: `−${cost} points : ${p.title}.` + (note ? ' ' + note.slice(0, 140) : '') });
+      save(); closeModal(); toast('−' + cost + ' points'); render();
+    },
+  });
+}
+
+function editPenalty(id) {
+  const p = state.penalties.find(x => x.id === id) || { id: '', emoji: EMOJIS_RETRAITS[0], title: '', cost: 10 };
+  openModal(`
+    <h3>${p.id ? 'Modifier' : 'Nouvelle bêtise'}</h3>
+    <label class="f">Image</label>
+    ${emojiPicker(EMOJIS_RETRAITS, p.emoji)}
+    <label class="f" for="fTitle">Bêtise</label>
+    <input type="text" id="fTitle" maxlength="40" value="${esc(p.title)}" placeholder="ex. Mentir">
+    <label class="f" for="fCost">Points retirés</label>
+    <input type="number" id="fCost" min="1" max="100" inputmode="numeric" value="${p.cost}">
+    <p class="hint">Garde des retraits petits : elle doit gagner bien plus souvent qu'elle ne perd.</p>
+    <div class="actions">
+      ${p.id ? '<button class="btn rouge" data-m="del">Supprimer</button>' : ''}
+      <button class="btn gris" data-m="close">Annuler</button>
+      <button class="btn vert" data-m="ok">Enregistrer</button>
+    </div>`, {
+    ok() {
+      const title = $('#fTitle').value.trim();
+      if (!title) { $('#fTitle').focus(); return; }
+      const data = { emoji: pickedEmoji(p.emoji), title, cost: Math.max(1, Math.min(100, parseInt($('#fCost').value, 10) || 1)) };
+      if (p.id) Object.assign(state.penalties.find(x => x.id === p.id), data);
+      else state.penalties.push(Object.assign({ id: uid() }, data));
+      save(); closeModal(); render();
+    },
+    del() {
+      if (!confirm('Supprimer « ' + p.title + ' » de la liste ?')) return;
+      state.penalties = state.penalties.filter(x => x.id !== p.id);
       save(); closeModal(); render();
     },
   });
@@ -1037,6 +1140,8 @@ view.addEventListener('click', e => {
       state.calc.level = Math.max(1, Math.min(6, parseInt($('#calcLevel').value, 10) || 2));
       save(); toast('Calcul mental enregistré'); render(); break;
     case 'backup': downloadBackup(); break;
+    case 'penalty-apply': applyPenalty(); break;
+    case 'edit-penalty': editPenalty(id); break;
     case 'restore': $('#restoreFile').click(); break;
     case 'save-bonus':
       state.bonus = { enabled: $('#bonusOn').checked, points: Math.max(1, Math.min(50, parseInt($('#bonusPts').value, 10) || 5)) };
